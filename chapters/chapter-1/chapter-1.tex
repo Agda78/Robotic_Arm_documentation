@@ -1,0 +1,105 @@
+\chapter{Controllo Motori}
+Il controllo dei motori è costituito da una serie di considerazioni prettamente tecnologiche e pratiche che hanno come obiettivo quello di andare a generare un segnale PWM apposito, per il pilotaggio di 5 servomotori MG996R
+
+\section{Albero di clock}
+La prima considerazione da andare a fare, pre prefissare poi i ragionamenti che saranno fatti successivamente. è la frequenza a cui i timer lavorano per tale sistema. Tale frequenza viene configurata nel clock tree. Il clock tree è configurabile a mano, oppure, considerando la casella di interesse, scrivendo la frequenza targer, il clock tree sì modificherà in automatico per ottenere tale frequenza. Nel nostro caso, desideriamo una frequenza di 16 Mhz pertanto scriveremo tale valore nell'apposita cella (come sì può notare dalla figura [\ref{img:clock-tree}])
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig/chapter-1/clock-tree.png}
+\caption{Configurazione clock tree}\label{img:clock-tree}
+\end{figure}
+
+Tale cella è stata scelta dato che il timer 2 ed il timer 3 (scelti arbitrariamente dati i 5 canali richiesti) sono collegati al Bus APB1
+
+\section{Configurazione Timers e Pin di uscita}
+Per la configurazione che si sta andando a considerare, saranno richiesti almeno 5 pin che saranno impiegati come pin di uscita pwm. Per la configurazione di tali pin, si andranno a considerare 2 timer. Timer 2 e Timer 3.
+Da cube MX, se sì esplora il menu Timers (in pinout configurations), sì potranno andare a visualizzare tutti i timer presenti nel microcontrollore, nel nostro caso ci interessano solo il 2 ed il 3.
+
+Le operazioni che andrò ad effettuare ora potrenno essere re-iterate per il Tim 3 sui successivi 4 canali. Saranno lasciate delle immagini di riferimento per far sì che la configurazione sia corretta.
+
+Come prima cosa, cliccato sul timer 2, andiamo a settare come fonte di clock il clock interno. Poi settiamo i canali (nel caso del tim 2 solo i primi 2, per il tim 3 tutti e 4) come pwm generation. [\ref{img:Channel-abilitation}].
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig/chapter-1/channel-abilitation.png}
+\caption{Configurazione timer e canali}\label{img:Channel-abilitation}
+\end{figure}
+
+Una volta settate le configurazioni precedenti, dal menu che è presente in basso sarà possibile settare vari valori. Come prima cosa, andiamo a settare il prescaler (una prima divisione del clock in ingresso configurato nel clock tree). 
+Il prescaler viene settato a valle di tale ragionamento, considerando che vogliamo settare il registro CCR con un valore in percentuale espresso come un intero percentuale [sensibilità dell'\(1\%\)] su un periodo di \(20\ ms\), allora bisognerà fare in modo che la frequenza di uscita del prescaler sia:
+
+Consideriamo il periodo del clock di base come \(T_c = \frac{1}{16*10^6}\ s\), mentre il periodo desiderato (dopo il prescaler), è di: \(T_p\frac{20\ ms}{100} = 0.2\ ms\).
+Pertanto, il numero di tick che il prescaler deve contare è uguale a:  \(\frac{T_p}{T_c} = 0.2 * 10^{-3} * 16 * 10^{6} = 3.2 * 10^{3} = 3200\ Tick\)
+
+Settato tale valore, basterà settare il valore dell ARR a \(100\ Tick\) per ottenere in questo modo un timer che conta per \(100\ Tick\) in \(20\ ms\).
+
+Per settare tali valori (una volta per entrambi i timer, proseguiamo nel modo presente all'interno della figura [\ref{img:timer-configuration}])
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig/chapter-1/prescaler-configuration.png}
+\caption{Configurazione dei perametri dei timer e dei rispettivi canali per TIM 2}\label{img:timer-configuration}
+\end{figure}
+
+Prima di passare all'area codice, è importante andare a visualizzare su quali pin tali timer vanno a generare il PWM, per tali parametri, dai menu di impostazione del Timer (quelli in basso blu), premere su GPIO settings, e visualizzare su quali pin e rispetto a quali canali, tali pin siano mappati (dalla figura dovrebbero essere anche visibili su dei pin che sì sono attivati e verdi) [\ref{img:GPIO-channel}]
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{fig/chapter-1/gpio-configuration.png}
+\caption{Pin di collegamenti rispetto ai canali abilitati per TIM 2}\label{img:GPIO-channel}
+\end{figure}
+
+\section{Mappatura motori}
+Un motore può essere mappato, per semplicità implementativa, mediante il valore dell'angolo che deve assumere con un id intero. Quindi, nel nostro caso, considerando 5 motori, ogni motore sarà caratterizzato da un id intero da 1 a 5. Tale id è utile per le gestioni successive, sopratutto nel codice, dove sì potranno andare a cambiare i valori di CCR, rispetto al singolo canale, senza doversi ricordare i vari pin, timer e canali per ogni motore. Per modificare il registro CCR, sì utilizza la seguente funzione (scritta a mano)
+
+\begin{lstlisting}[language=C, title={Settaggio del resgistro CCR (Pulse) con STMCubeIDE e HAL}]
+TIM_OC_InitTypeDef sConfigOC;
+sConfigOC.OCMode = TIM_OCMODE_PWM1;
+sConfigOC.Pulse = value;
+sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+
+HAL_TIM_PWM_ConfigChannel(&htimx, &sConfigOC, TIM_CHANNEL_x);
+HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+\end{lstlisting}
+
+dove al posto di x, andrà il numero di identificazione del timer e del canale per ogni motore. Data l'assunzione di prima, secondo cui ogni motore è identificato da un numero intero, sarà possibile definire la seguente funzione:
+
+\begin{lstlisting}[language=C, title={Settaggio di Pulse considerando il codice identificativo di un singolo motore}]
+void user_pwm_setvalue(uint16_t value, uint8_t motor_id)
+{
+	TIM_OC_InitTypeDef sConfigOC;
+	sConfigOC.OCMode = TIM_OCMODE_PWM1;
+	sConfigOC.Pulse = value;
+	sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+	sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+
+	if (motor_id < 3){
+		if (motor_id == 1){
+		    HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1);
+		    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+		}else if (motor_id == 2){
+			HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_2);
+			HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+		}
+	}else if(motor_id < 7){
+		if(motor_id == 3){
+			HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1);
+			HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+		}else if(motor_id == 4){
+			HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2);
+			HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+		}else if(motor_id == 5){
+			HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3);
+			HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+		}else if(motor_id == 6){
+			HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_4);
+			HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
+		}
+	}
+}
+\end{lstlisting}
+
+In cui, value è la percentuale di periodo da portare alto (o valore del CCR da assegnare). Mentre motor\_id è il valore intero associato al motore (che lo identifica univocamente).
+
