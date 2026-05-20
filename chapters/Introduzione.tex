@@ -1,4 +1,13 @@
 \chapter*{Introduzione}
 \addcontentsline{toc}{chapter}{Introduzione}
 
-Documentazione per l'implementazione e l'utilizzo del braccio robotico per il corso di IMSI e IM4BCI
+Documentazione per l'implementazione e l'utilizzo del braccio robotico per il corso di IMSI e IM4BCI.
+
+Nello specifico, le implementazioni presentate in questo documento sono utilizzate sul seguente hardware:
+\begin{itemize}
+    \item \textbf{Nucleo-F401RE}: Scheda di sviluppo prodotta da ST Microelectronics
+    \item \textbf{X-Nucleo-BNRG2A1}: Expansion Board da poter montare sulla F401 per utilizzare la comunicazione bluetooth low energy
+    \item \textbf{SensorTile}: Apparecchio della famiglia STMicroelectronics che permette di poter leggere i valori di vari sensori quali: accellerometro, giroscopio, ecc.
+\end{itemize}
+
+Il documento è diviso in due parti principali, la parte dedicata allo sviluppo effettivo del controllo del braccio robotico, partendo dal basso livello a salire a controllo di alto livello; e la parte dedicata all'integrazione, dove sono stati aggiunti vari accorgimenti per permettere il funzionamento del braccio robotico integrata con le restanti parti del progetto
