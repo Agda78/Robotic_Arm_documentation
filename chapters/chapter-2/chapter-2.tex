@@ -1,27 +1,2 @@
-\chapter{Integrazione}
-La parte di integrazione va a definire una serie di modalità con cui il sistema del braccio robotico deven interagire con le restanti parti del progetto. 
+\chapter{Algoritmo di controllo del braccio}
 
-\section{Controllo Ambientale e Sicurezza Operatore}
-Il controllo ambientale e la sicuressa operatore sono collegati con la board del braccio mediante 2 cavi. Uno che funziona da sistema di emergenza, nel caso si abbassi il braccio verrà fermato direttamente. Mentre l'altro utilizzato per la fase di ripresa operativa che permette al braccio di poter tornare a funzionare.
-Tale meccanismo funziona grazie all'implementazione di specifiche ISR che vanno ad infierire su una variabile che va ad annullare qualunque tentativo di moviento da parte del braccio (attenzione, non interrompe la comunicazione bluetooth, ma ferma il braccio andando a dare dei dati nulli all'azionamento, come se la persona non stesse girando). Tale meccanimo permette di evitare frenate brusche.
-
-Tecnicamente, si hanno due segnali per ogni accertamento di sicurezza (Ambientale ed Operatore). Più tecnicamente, i due segnali sono da interpretare nel seguente modo:
-\begin{itemize}
-    \item \textbf{Set}: tale segnale scatena una ISR il cui unico compito è quello di andare ad infierire sulla variabile di controllo della sicurezza, fermando il braccio
-
-    \item \textbf{Reset}: Tale segnale scatena una ISR il cui compito è quello di verificare se tutti i segnali Set sono in una condizione adatta per permettere poi al braccio di poter poi ri-modificare la variabile per andare a ristabilire il funzionamento del braccio
-
-\end{itemize}
-
-\textit{* Tali ISR sono implementate all'interno del file it\_callbacks.c}
-
-\section{Sensor Tile}
-La Sensor Tile è stata integrata, invece, andandola a flashare con un firmware apposito (mediante la sua APP per cellulare ST BLE Sensor). Una volta preparata, si va ad inserire la epansion board ed a modificare la demo di utilizzo central. In questo modo i dati possono essere letti dalla board (dopo una serie di cast). Una volta letti, nella parte di integrazione del braccio, basta dichiarare una variabile condivisa che permetterà di:
-\begin{itemize}
-    \item \textbf{Modificare il Buffer di Arrivo}: Da non confondere con il buffer interno alla ISR
-    \item \textbf{Modificare la variabile di notifica}: Una volta che i dati sono stati ricevuti e correttamente inseiriti nell'apposita struttura viene modificata una variabile che permetterà, alla prossima esecuzione della ISR periodica, di andare a prelevare i dati correttamente inseriti nel buffer ricevente. Qui potrebbe esserci un problema di concorrenza sul buffer di ricezione. Dato che per ipotesi quest'ultima debba essere molto lenta rispetto al controllo, e che non parliamo di un sistema preemptive, ma di un sistema bare metal basato su un single core che esegue le ISR, allora possiamo non implementare dei meccanismi di concorrenza
-\end{itemize}
-
-Questo permetterà poi al braccio di potersi muovere in base ai dati ricevuti dalla sensor tile.
-
-Ho però un dubbio che bisogna chiarire con gli altri gruppi, in particolare con quello di comunicazione. Ora la sensor tile si interfaccia direttamente con lo schedino di controllo del braccio. Questo è un problema se consideriamo l'operatore che deve interagire con il sistema a partire da uno spot isolato. Bisogna quindi interfacciare il bluetooth con un dispositivo intermedio?
